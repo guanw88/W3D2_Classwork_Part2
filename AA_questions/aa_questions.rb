@@ -41,7 +41,7 @@ class User
       SELECT
         *
       FROM
-        users
+        userssql
       WHERE
         fname = ? AND lname = ?
     SQL
@@ -56,6 +56,13 @@ class User
     @lname = options['lname']
   end 
   
+  def authored_questions 
+    Question.find_by_author_id(@id)
+  end 
+  
+  def authored_replies 
+    Reply.find_by_user_id(@id)
+  end 
   
 end
 
@@ -90,7 +97,6 @@ class Question
     questions.map { |question| Question.new(question) }
   end 
   
-  
   def initialize(options) 
     @id = options['id']
     @title = options['title']
@@ -98,10 +104,12 @@ class Question
     @author_id = options['author_id']
   end 
   
-  def author 
+  def author
+    User.find_by_id(@author_id)
   end 
   
   def replies 
+    Reply.find_by_question_id(@id)
   end 
   
 end 
@@ -158,6 +166,33 @@ class Reply
     @parent_reply_id = options['parent_reply_id']
     @user_id = options['user_id']
   end 
+  
+  def author 
+    User.find_by_id(@user_id)
+  end 
+  
+  def question 
+    Question.find_by_id(@question_id)
+  end 
+  
+  def parent_reply 
+    Reply.find_by_id(@parent_reply_id)
+  end 
+  
+  def child_replies
+    replies = QuestionsDatabase.instance.execute(<<-SQL, @id)
+      SELECT
+        *
+      FROM
+        replies
+      WHERE
+        parent_reply_id = ?
+    SQL
+    return nil unless replies.length > 0
+
+    replies.map { |reply| Reply.new(reply) }
+  end 
+  
 end 
 
 class Follow 
