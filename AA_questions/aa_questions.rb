@@ -18,23 +18,75 @@ class QuestionsDatabase < SQLite3::Database
   end
 end
 
-
-class User 
-  attr_accessor :fname, :lname
+class ModelBase 
+  
+  def self.get_table(class_name)
+    class_name = class_name.to_s
+  
+    case class_name
+    when "User"
+      return "users"
+    when "Question"
+      return "questions"
+    when "Reply"
+      return "replies"
+    end 
+  end 
   
   def self.find_by_id(id)
-    user = QuestionsDatabase.instance.execute(<<-SQL, id)
+    result = QuestionsDatabase.instance.execute(<<-SQL, id)
       SELECT
         *
       FROM
-        users
+        #{self.get_table(self)}
       WHERE
         id = ?;
     SQL
-    return nil unless user.length > 0
+    return nil unless result.length > 0
 
-    User.new(user.first)
+    self.new(result.first)
   end 
+  
+  def self.all
+    result = QuestionsDatabase.instance.execute(<<-SQL)
+      SELECT
+        *
+      FROM
+        #{self.get_table(self)};
+    SQL
+    return nil unless result.length > 0
+    result.map { |entry| self.new(entry) }
+  end 
+  
+  def save 
+    
+    if @id.nil?
+      instance_vars = self.instance_variables[1..-1]
+      
+      
+      QuestionsDatabase.instance.execute(<<-SQL, instance_vars)
+        INSERT INTO
+          #{self.get_table(self)} (#{instance_vars.map {|val| val.to_s }.join(',')})
+        VALUES
+          (#{instance_vars.map {|val| "?" }.join(',')})
+      SQL
+      @id = QuestionsDatabase.instance.last_insert_row_id
+    else 
+      QuestionsDatabase.instance.execute(<<-SQL, @fname, @lname, @id)
+        UPDATE
+          users
+        SET
+          fname = ?, lname = ?
+        WHERE
+          id = ?
+      SQL
+    end 
+  end 
+  
+end 
+
+class User < ModelBase
+  attr_accessor :fname, :lname
   
   def self.find_by_name(fname, lname)
     users = QuestionsDatabase.instance.execute(<<-SQL, fname, lname)
@@ -72,6 +124,8 @@ class User
     QuestionLike.liked_questions_for_user_id(@id)
   end 
   
+  # Calculate average karma using Ruby methods 
+  
   # def average_karma 
   #   questions = self.authored_questions
   #   num_questions = questions.length
@@ -82,6 +136,7 @@ class User
   #   avg_karma = num_likes.to_f / num_questions.to_f
   # end 
   
+  # Calculate average karma using SQL query
   def average_karma
     counts = QuestionsDatabase.instance.execute(<<-SQL, @id)
       SELECT
@@ -97,45 +152,31 @@ class User
     return counts[0]["num_likes"].to_f / counts[0]["num_questions"]
   end 
   
-  def save 
-    if @id.nil?
-      QuestionsDatabase.instance.execute(<<-SQL, @fname, @lname)
-        INSERT INTO
-          users (fname, lname)
-        VALUES
-          (?, ?)
-      SQL
-      @id = QuestionsDatabase.instance.last_insert_row_id
-    else 
-      QuestionsDatabase.instance.execute(<<-SQL, @fname, @lname, @id)
-        UPDATE
-          users
-        SET
-          fname = ?, lname = ?
-        WHERE
-          id = ?
-      SQL
-    end 
-  end 
+  # def save 
+  #   if @id.nil?
+  #     QuestionsDatabase.instance.execute(<<-SQL, @fname, @lname)
+  #       INSERT INTO
+  #         users (fname, lname)
+  #       VALUES
+  #         (?, ?)
+  #     SQL
+  #     @id = QuestionsDatabase.instance.last_insert_row_id
+  #   else 
+  #     QuestionsDatabase.instance.execute(<<-SQL, @fname, @lname, @id)
+  #       UPDATE
+  #         users
+  #       SET
+  #         fname = ?, lname = ?
+  #       WHERE
+  #         id = ?
+  #     SQL
+  #   end 
+  # end 
   
 end
 
-class Question 
+class Question < ModelBase
   attr_accessor :title, :body, :author_id
-  
-  def self.find_by_id(id)
-    question = QuestionsDatabase.instance.execute(<<-SQL, id)
-      SELECT
-        *
-      FROM
-        questions
-      WHERE
-        id = ?;
-    SQL
-    return nil unless question.length > 0
-
-    Question.new(question.first)
-  end 
   
   def self.find_by_author_id(author_id)
     questions = QuestionsDatabase.instance.execute(<<-SQL, author_id)
@@ -186,45 +227,31 @@ class Question
     QuestionLike.num_likes_for_question_id(@id)
   end 
   
-  def save 
-    if @id.nil?
-      QuestionsDatabase.instance.execute(<<-SQL, @title, @body, @author_id)
-        INSERT INTO
-          questions (title, body, author_id)
-        VALUES
-          (?, ?, ?)
-      SQL
-      @id = QuestionsDatabase.instance.last_insert_row_id
-    else 
-      QuestionsDatabase.instance.execute(<<-SQL, @title, @body, @author_id, @id)
-        UPDATE
-          questions
-        SET
-          title = ?, body = ?, author_id = ?
-        WHERE
-          id = ?
-      SQL
-    end 
-  end 
+  # def save 
+  #   if @id.nil?
+  #     QuestionsDatabase.instance.execute(<<-SQL, @title, @body, @author_id)
+  #       INSERT INTO
+  #         questions (title, body, author_id)
+  #       VALUES
+  #         (?, ?, ?)
+  #     SQL
+  #     @id = QuestionsDatabase.instance.last_insert_row_id
+  #   else 
+  #     QuestionsDatabase.instance.execute(<<-SQL, @title, @body, @author_id, @id)
+  #       UPDATE
+  #         questions
+  #       SET
+  #         title = ?, body = ?, author_id = ?
+  #       WHERE
+  #         id = ?
+  #     SQL
+  #   end 
+  # end 
   
 end 
 
-class Reply 
+class Reply < ModelBase
   attr_accessor :body, :question_id, :parent_reply_id, :user_id
-  
-  def self.find_by_id(id)
-    reply = QuestionsDatabase.instance.execute(<<-SQL, id)
-      SELECT
-        *
-      FROM
-        replies
-      WHERE
-        id = ?;
-    SQL
-    return nil unless reply.length > 0
-
-    Reply.new(reply.first)
-  end 
   
   def self.find_by_user_id(user_id)
     replies = QuestionsDatabase.instance.execute(<<-SQL, user_id)
@@ -288,26 +315,26 @@ class Reply
     replies.map { |reply| Reply.new(reply) }
   end 
   
-  def save 
-    if @id.nil?
-      QuestionsDatabase.instance.execute(<<-SQL, @body, @question_id, @parent_reply_id, @user_id)
-        INSERT INTO
-          replies (body, question_id, parent_reply_id, user_id)
-        VALUES
-          (?, ?, ?, ?)
-      SQL
-      @id = QuestionsDatabase.instance.last_insert_row_id
-    else 
-      QuestionsDatabase.instance.execute(<<-SQL, @body, @question_id, @parent_reply_id, @user_id, @id)
-        UPDATE
-          replies
-        SET
-          body = ?, question_id = ?, parent_reply_id = ?, user_id = ?
-        WHERE
-          id = ?
-      SQL
-    end 
-  end 
+  # def save 
+  #   if @id.nil?
+  #     QuestionsDatabase.instance.execute(<<-SQL, @body, @question_id, @parent_reply_id, @user_id)
+  #       INSERT INTO
+  #         replies (body, question_id, parent_reply_id, user_id)
+  #       VALUES
+  #         (?, ?, ?, ?)
+  #     SQL
+  #     @id = QuestionsDatabase.instance.last_insert_row_id
+  #   else 
+  #     QuestionsDatabase.instance.execute(<<-SQL, @body, @question_id, @parent_reply_id, @user_id, @id)
+  #       UPDATE
+  #         replies
+  #       SET
+  #         body = ?, question_id = ?, parent_reply_id = ?, user_id = ?
+  #       WHERE
+  #         id = ?
+  #     SQL
+  #   end 
+  # end 
   
 end 
 
