@@ -97,6 +97,27 @@ class User
     return counts[0]["num_likes"].to_f / counts[0]["num_questions"]
   end 
   
+  def save 
+    if @id.nil?
+      QuestionsDatabase.instance.execute(<<-SQL, @fname, @lname)
+        INSERT INTO
+          users (fname, lname)
+        VALUES
+          (?, ?)
+      SQL
+      @id = QuestionsDatabase.instance.last_insert_row_id
+    else 
+      QuestionsDatabase.instance.execute(<<-SQL, @fname, @lname, @id)
+        UPDATE
+          users
+        SET
+          fname = ?, lname = ?
+        WHERE
+          id = ?
+      SQL
+    end 
+  end 
+  
 end
 
 class Question 
@@ -163,6 +184,27 @@ class Question
   
   def num_likes 
     QuestionLike.num_likes_for_question_id(@id)
+  end 
+  
+  def save 
+    if @id.nil?
+      QuestionsDatabase.instance.execute(<<-SQL, @title, @body, @author_id)
+        INSERT INTO
+          questions (title, body, author_id)
+        VALUES
+          (?, ?, ?)
+      SQL
+      @id = QuestionsDatabase.instance.last_insert_row_id
+    else 
+      QuestionsDatabase.instance.execute(<<-SQL, @title, @body, @author_id, @id)
+        UPDATE
+          questions
+        SET
+          title = ?, body = ?, author_id = ?
+        WHERE
+          id = ?
+      SQL
+    end 
   end 
   
 end 
@@ -244,6 +286,27 @@ class Reply
     return nil unless replies.length > 0
 
     replies.map { |reply| Reply.new(reply) }
+  end 
+  
+  def save 
+    if @id.nil?
+      QuestionsDatabase.instance.execute(<<-SQL, @body, @question_id, @parent_reply_id, @user_id)
+        INSERT INTO
+          replies (body, question_id, parent_reply_id, user_id)
+        VALUES
+          (?, ?, ?, ?)
+      SQL
+      @id = QuestionsDatabase.instance.last_insert_row_id
+    else 
+      QuestionsDatabase.instance.execute(<<-SQL, @body, @question_id, @parent_reply_id, @user_id, @id)
+        UPDATE
+          replies
+        SET
+          body = ?, question_id = ?, parent_reply_id = ?, user_id = ?
+        WHERE
+          id = ?
+      SQL
+    end 
   end 
   
 end 
